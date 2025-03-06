@@ -1,0 +1,80 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Läs in CSV-filen
+csv_file_path = "/Users/alfonsbergsson/Downloads/Antal_Skadade_Personer_Polis_och_Sjukvard_000101-240731_241008.csv"
+df = pd.read_csv(csv_file_path, sep=None, engine='python', encoding='ISO-8859-1')
+
+
+# Ta bort eventuella mellanslag i kolumnnamn
+df.columns = df.columns.str.strip()
+
+# Kontrollera förväntade kolumner
+expected_columns = ['Year', 'Quantity', 'Severity', 'County']
+for col in expected_columns:
+    if col not in df.columns:
+        print(f"Kolumnen '{col}' finns inte i DataFrame. Kontrollera CSV-filen.")
+
+# Konvertera kolumner till numeriska värden där det är möjligt
+for column in ['Year', 'Quantity']:
+    df[column] = pd.to_numeric(df[column], errors='coerce')
+
+# Fyll saknade värden med medianen
+df.fillna(df.median(numeric_only=True), inplace=True)
+
+# Beräkna olyckstillväxt per år
+df['Accident Growth'] = df.groupby('Year')['Quantity'].diff()
+
+# Filtrera de senaste 10 åren
+df_filtered = df[df['Year'] >= (df['Year'].max() - 10)]
+
+# Gruppsammanfattning per år
+summary = df_filtered.groupby('Year').agg({
+    'Quantity': 'sum',
+    'Accident Growth': 'mean'
+}).reset_index()
+
+print(summary)
+# Ta bort rader där 'Accident Growth' är NaN (första året i diff())
+df_filtered.dropna(subset=['Accident Growth'], inplace=True)
+
+# HISTOGRAM
+plt.figure(figsize=(10, 6))
+plt.hist(df_filtered['Year'], bins=10, color="pink", edgecolor='black')  
+plt.grid(axis='y', alpha=0.75)
+plt.title('Antal Olyckor per År')
+plt.xlabel('År')
+plt.ylabel('Frekvens')
+plt.xticks(rotation=45)
+plt.show()
+
+# TÅRTDIAGRAM
+plt.figure(figsize=(10, 6))
+labels = summary['Year']
+sizes = summary['Quantity']
+colors = plt.cm.Pastel1(np.linspace(0, 1, len(labels)))
+plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=140)
+plt.title('Olycksfördelning över de senaste 10 åren')
+plt.axis('equal')
+plt.show()
+
+# SCATTERPLOT
+plt.figure(figsize=(10, 6))
+plt.scatter(df_filtered['Year'], df_filtered['Accident Growth'], color='red', edgecolor='black')  
+plt.title('Olyckstillväxt över Tid')
+plt.xlabel('År')
+plt.ylabel('Tillväxt i antal olyckor')
+plt.grid(True, linestyle='--', linewidth=0.5)  
+plt.show()
+
+# LINJEDIAGRAM
+plt.figure(figsize=(12, 8))
+plt.plot(df_filtered['Year'], df_filtered['Accident Growth'], marker='o', linestyle='-', color='blue', linewidth=2)
+plt.title('Olyckstillväxt per År')
+plt.xlabel('År')
+plt.ylabel('Olyckstillväxt')
+plt.grid(True, linestyle='--', linewidth=0.5)
+plt.show()
+
+print("Analysen är klar och diagram har genererats!")
